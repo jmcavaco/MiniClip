@@ -11,8 +11,7 @@ L3: Unusual number
 Exit code 1 if any L1 or L2 finding.
 L3 findings are shown only when there are no L1 or L2 findings.
 
-Commands: ID = details | n = next | p = previous
-          /text = search | f L1/L2/L3/all = filter | q = quit
+Commands: ID = details | n = next | p = previous | f L1/L2/L3/all = filter | q = quit
 """
 import plistlib
 import re
@@ -21,7 +20,7 @@ from collections import Counter
 
 TOKEN = re.compile(r"%(?:\d+\$)?[@diufs]|\{[^{}]*\}|[A-Z]:\[|\]")
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
-
+PAGE_SIZE = 15
 
 def tokens(text):
     found = TOKEN.findall(text)
@@ -68,12 +67,10 @@ def placeholder_problems(data):
 
     return bad, ties
 
+def check_l1(old, new):
+    """L1: placeholder mismatches. Returns (findings, fixed)."""
+    L1, fixed = [], []
 
-def main(old_path, new_path):
-    old, new = load(old_path), load(new_path)
-    L1, L2, L3, fixed = [], [], [], []
-
-    # L1: placeholder problems.
     (old_bad, _), (new_bad, ties) = (
         placeholder_problems(old),
         placeholder_problems(new),
@@ -108,8 +105,13 @@ def main(old_path, new_path):
                 f"{old[key][lang]!r} -> {new_text!r}"
             )
 
-    # L2: removed keys remain individual findings.
-    # Missing and empty translations are aggregated by language.
+    return L1, fixed
+
+
+def check_l2(old, new):
+    """L2: removed keys, missing languages, empty translations."""
+    L2 = []
+
     all_langs = {
         lang
         for data in (old, new)
@@ -163,7 +165,13 @@ def main(old_path, new_path):
             + "\n".join(f"  - {key}" for key in keys)
         ))
 
-    # L3: numbers unique to one language.
+    return L2
+
+
+def check_l3(new):
+    """L3: numbers that appear in only one language."""
+    L3 = []
+
     for key, langs in new.items():
         nums = {
             lang: numbers(text)
@@ -183,22 +191,30 @@ def main(old_path, new_path):
             odd = found_numbers - other_numbers
 
             if odd and len(nums) >= 3:
+                different_numbers = sorted(odd)
+                expected_numbers = sorted(other_numbers)
+
                 L3.append((
-                    f"{key}: {lang} - unique numbers {sorted(odd)}",
+                    f"{key}: {lang} - different numbers {different_numbers}, "
+                    f"expected numbers {expected_numbers}",
                     f"KEY: {key}\n"
                     f"LANGUAGE: {lang}\n"
-                    f"UNIQUE NUMBERS: {sorted(odd)}\n"
+                    f"DIFFERENT NUMBER(S): {different_numbers}\n"
+                    f"EXPECTED NUMBER(S): {expected_numbers}\n"
                     f"TEXT: {langs[lang]!r}"
                 ))
 
-    show_L3 = not (L1 or L2)
-    verdict = (
-        "NO-SHIP" if (L1 or L2)
-        else "REVIEW" if L3
-        else "OK"
-    )
+    return L3
 
-    # Verdict first.
+def get_verdict(L1, L2, L3):
+    if L1 or L2:
+        return "NO-SHIP"
+    if L3:
+        return "REVIEW"
+    return "OK"
+
+
+def show_verdict(verdict, old_path, new_path, L1, L2, L3):
     print("\n" + "=" * 64)
     print("             LOCALISATION RELEASE CHECK")
     print("=" * 64)
@@ -219,157 +235,171 @@ def main(old_path, new_path):
 
     print("=" * 64)
 
-    groups = [
+
+def build_groups(L1, L2, L3, show_L3):
+    return [
         ("L1", "CRITICAL - Placeholder mismatches", L1),
         ("L2", "MISSING - Empty, missing, or removed text", L2),
-        ("L3", "REVIEW - Possible gameplay issues",
-         L3 if show_L3 else []),
+        ("L3", "REVIEW - Possible gameplay issues", L3 if show_L3 else []),
     ]
 
-    # Assign stable IDs across all visible findings.
+
+def collect_findings(groups):
+    """Give every visible finding a stable ID."""
     findings = []
 
     for code, title, items in groups:
-        if not items:
-            continue
-
-        print(f"\n{code} | {title} ({len(items)} finding(s))")
-
         for summary, detail in items:
-            finding_id = str(len(findings) + 1)
             findings.append({
-                "id": finding_id,
+                "id": str(len(findings) + 1),
                 "code": code,
                 "summary": summary,
                 "detail": detail,
             })
 
+    return findings
+
+
+def show_groups(groups):
+    for code, title, items in groups:
+        if items:
+            print(f"\n{code} | {title} ({len(items)} finding(s))")
+
+
+def show_deferred(L3, show_L3):
     if L3 and not show_L3:
         print(
             f"\nL3 details deferred ({len(L3)} finding(s)); "
             "resolve L1/L2 findings first."
         )
 
-    # Fixed issues are informational, not current risks.
-    if fixed:
-        print(f"\nFIXED - {len(fixed)} resolved issue(s)")
-        print("-" * 64)
 
-        for item in fixed:
-            print(f"  + {item}")
+def show_fixed(fixed):
+    if not fixed:
+        return
 
-    # Interactive paginated browser.
+    print(f"\nFIXED - {len(fixed)} resolved issue(s)")
+    print("-" * 64)
+
+    for item in fixed:
+        print(f"  + {item}")
+
+
+def matching_findings(findings, active_filter, search_term):
+    result = findings
+
+    if active_filter != "all":
+        result = [i for i in result if i["code"].lower() == active_filter]
+
+    if search_term:
+        needle = search_term.casefold()
+        result = [
+            i for i in result
+            if needle in i["summary"].casefold()
+            or needle in i["detail"].casefold()
+        ]
+
+    return result
+
+
+def show_page(findings, page, active_filter, search_term):
+    result = matching_findings(findings, active_filter, search_term)
+    pages = max(1, (len(result) + PAGE_SIZE - 1) // PAGE_SIZE)
+    current = min(page, pages - 1)
+
+    print("\n" + "-" * 64)
+    print(f"FINDINGS | {len(result)} matches | page {current + 1}/{pages}")
+    print("-" * 64)
+
+    start = current * PAGE_SIZE
+
+    for item in result[start:start + PAGE_SIZE]:
+        print(f"  [{item['id']:>4}] {item['code']}  {item['summary']}")
+
+    print("\nCommands: ID = details | n = next | p = previous")
+    print("      | f L1/L2/L3/all = filter | q = quit")
+
+
+def show_detail(item):
+    print("\n" + "-" * 64)
+    print(f"FINDING ID: {item['id']}")
+    print(f"TYPE: {item['code']}")
+    print(item["detail"])
+    print("-" * 64)
+
+
+def browse(findings):
+    """Interactive browser: pages, filter, search, details."""
+    page = 0
+    active_filter = "all"
+    search_term = ""
+    by_id = {item["id"]: item for item in findings}
+
+    show_page(findings, page, active_filter, search_term)
+
+    while True:
+        try:
+            command = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        lower = command.lower()
+
+        if lower in ("q", "quit", "exit", ""):
+            break
+
+        if lower == "n":
+            last = max(0, (len(matching_findings(findings, active_filter, search_term)) - 1) // PAGE_SIZE)
+            page = min(page + 1, last)
+            show_page(findings, page, active_filter, search_term)
+
+        elif lower == "p":
+            page = max(0, page - 1)
+            show_page(findings, page, active_filter, search_term)
+
+        elif lower.startswith("f "):
+            requested = lower[2:].strip()
+
+            if requested not in ("all", "l1", "l2", "l3"):
+                print("Use: f all, f L1, f L2, or f L3")
+                continue
+
+            active_filter = requested
+            page = 0
+            show_page(findings, page, active_filter, search_term)
+
+        elif command in by_id:
+            show_detail(by_id[command])
+
+        else:
+            print("Unknown command. Use an ID, n, p, f L1/L2/L3/all, or q.")
+
+
+def show_final(verdict, L1, L2, L3):
+    print(f"\nFINAL VERDICT: {verdict} (L1={len(L1)} L2={len(L2)} L3={len(L3)})")
+
+def main(old_path, new_path):
+    old, new = load(old_path), load(new_path)
+
+    L1, fixed = check_l1(old, new)
+    L2 = check_l2(old, new)
+    L3 = check_l3(new)
+
+    show_L3 = not (L1 or L2)
+    verdict = get_verdict(L1, L2, L3)
+    groups = build_groups(L1, L2, L3, show_L3)
+    findings = collect_findings(groups)
+
+    show_verdict(verdict, old_path, new_path, L1, L2, L3)
+    show_groups(groups)
+    show_deferred(L3, show_L3)
+    show_fixed(fixed)
+
     if findings and sys.stdin.isatty():
-        page_size = 15
-        page = 0
-        active_filter = "all"
-        search_term = ""
-        by_id = {item["id"]: item for item in findings}
+        browse(findings)
 
-        def matching_findings():
-            result = findings
-
-            if active_filter != "all":
-                result = [
-                    item for item in result
-                    if item["code"].lower() == active_filter
-                ]
-
-            if search_term:
-                needle = search_term.casefold()
-                result = [
-                    item for item in result
-                    if needle in item["summary"].casefold()
-                    or needle in item["detail"].casefold()
-                ]
-
-            return result
-
-        def show_page():
-            result = matching_findings()
-            pages = max(
-                1, (len(result) + page_size - 1) // page_size
-            )
-            current = min(page, pages - 1)
-
-            print("\n" + "-" * 64)
-            print(
-                f"FINDINGS | {len(result)} matches | "
-                f"page {current + 1}/{pages}"
-            )
-            print("-" * 64)
-
-            start = current * page_size
-
-            for item in result[start:start + page_size]:
-                print(
-                    f"  [{item['id']:>4}] "
-                    f"{item['code']}  {item['summary']}"
-                )
-
-            print("\nCommands: ID = details | n = next | p = previous")
-            print("          /text = search | f L1/L2/L3/all = filter | q = quit")
-
-        show_page()
-
-        while True:
-            try:
-                command = input("\n> ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                break
-
-            if command.lower() in ("q", "quit", "exit", ""):
-                break
-
-            lower = command.lower()
-
-            if lower == "n":
-                page = min(
-                    page + 1,
-                    max(0, (len(matching_findings()) - 1) // page_size),
-                )
-                show_page()
-
-            elif lower == "p":
-                page = max(0, page - 1)
-                show_page()
-
-            elif command.startswith("/"):
-                search_term = command[1:].strip()
-                page = 0
-                show_page()
-
-            elif lower.startswith("f "):
-                requested = lower[2:].strip()
-
-                if requested not in ("all", "l1", "l2", "l3"):
-                    print("Use: f all, f L1, f L2, or f L3")
-                    continue
-
-                active_filter = requested
-                page = 0
-                show_page()
-
-            elif command in by_id:
-                item = by_id[command]
-
-                print("\n" + "-" * 64)
-                print(f"FINDING ID: {item['id']}")
-                print(f"TYPE: {item['code']}")
-                print(item["detail"])
-                print("-" * 64)
-
-            else:
-                print(
-                    "Unknown command. Use an ID, n, p, /text, "
-                    "f L1/L2/L3/all, or q."
-                )
-
-    print(
-        f"\nFINAL VERDICT: {verdict} "
-        f"(L1={len(L1)} L2={len(L2)} L3={len(L3)})"
-    )
+    show_final(verdict, L1, L2, L3)
 
     return 1 if (L1 or L2) else 0
 

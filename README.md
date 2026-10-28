@@ -1,141 +1,37 @@
-# Localisation Plist Checker
+# Localisation release check
 
-A Python command-line tool for comparing two localisation `.plist` files to identify translation inconsistencies, missing entries, empty translations, and suspicious numeric differences.
-
-The tool compares an **old version** against a **new version**, highlights current risks, and tracks previously reported placeholder issues that have been resolved.
-
-## Features
-
-- **L1 — Placeholder inconsistencies:** Detects differences in format placeholders, such as `%@`, `%d`, or positional placeholders, across languages. Uses the majority pattern to identify likely inconsistencies; ties are flagged for manual review.
-- **L2 — Localisation completeness:** Detects removed keys, missing language entries, and empty translations.
-- **L3 — Numeric inconsistencies:** Flags numbers that appear in only one language for a key. These findings are shown only when there are no L1 or L2 issues.
-- **Fixed issues:** Identifies placeholder issues found in the old file that no longer appear in the new file. Fixed issues are reported separately from current risks.
-- **Aggregated findings:** Groups missing entries by language and empty translations by language to reduce repetitive output.
-- **Interactive findings browser:** Browse findings by page, search by text, filter by severity, and inspect individual findings.
-
-## Requirements
-
-- Python 3
-- Two valid property list (`.plist`) files
-
-The tool uses Python standard-library modules and does not require third-party packages.
-
-## Usage
-
-Place the script and your plist files in the same directory, then run:
-
-```bash
-python Tool.py
 ```
-
-By default, the script compares:
-
-- `OLD.plist` — the previous localisation version
-- `NEW.plist` — the updated localisation version
-
-Ensure these filenames match the paths configured in the script.
-
-## Checks Explained
-
-### L1 — Placeholder inconsistencies
-
-Format placeholders are compared across language translations for the same key.
-
-For example:
-
-```text
-English: "Hello, %@"
-French:  "Bonjour"
-German:  "Hallo, %@"
+python Tool.py localisations_1_2_0.plist localisations_1_2_1.plist
 ```
+Python 3+, standard library only. Read-only: it never edits a file. Exit code `0` = no L1/L2 findings, `1` = L1/L2 findings, `2` = a file could not be read. In a terminal it opens a small browser (`ID`, `n`, `p`, `f L1/L2/L3/all`, `q`); when piped (CI) it prints the summary only.
 
-The French translation is flagged because it does not contain the placeholder used by the majority of languages.
+## What I focused on and why
+Failures that reach players without anyone noticing, because a line-by-line diff can't show them: a placeholder lost or malformed (crash or literal `%u` on screen), text that is missing or empty, and a number that disagrees with the other languages. A releaser has minutes, so the report opens with one verdict and groups findings by severity.
 
-The tool reports the key, affected language, found placeholder pattern, expected pattern, and translation text where available.
+## How I decided what to check
+Each check answers "what does the client do if this is wrong?" and is cheap to run with few false alarms.
+- **L1 Placeholders (critical).** For each text ID, every language's placeholders (`%u`, `%@`, `%1$d`, `{0}`, stray `%`, and choice-group markers like `A:[` and `]`) are counted as an unordered set. The **majority** is the expected set. Languages that differ are flagged.
+- **L2 Missing content.** Removed keys, languages missing from keys, empty strings. Repeats are grouped by language, so one dropped language is one finding.
+- **L3 Unusual numbers.** A number that appears in one language and in none of the others (30 vs 3). Shown only when there are no L1/L2 findings, to keep the report short. 
+- **Fixes.** The live file is checked the same way, so a placeholder that was broken and is now correct is listed as FIXED rather than as a risk.
 
-**Important:** Majority-based comparison is a heuristic. If most languages share the same incorrect placeholder pattern, the tool may not detect the underlying mistake. Review ties and ambiguous cases manually.
+## What it does not catch (blind spots)
+- **Choice-group option counts:** `B:[a/b/c]` vs `B:[a/b]` looks identical, because only the brackets are counted.
+- **A dropped number:** L3 only sees extra numbers, not missing ones.
+- **Meaning errors,** tone and terminology, and whether a deleted key is still used by the client.
+- **Layout:** text length, line-break count, stray whitespace; **language codes** such as `jp`; the **version string**.
+- **A wrong majority** (several languages broken the same way) and keys with fewer than 3 translations.
+- **Wrong Translation** It would increase the number of warnings exponentially.
+- **Test coverage** I created additional .plist files to test the implemented checks, but they do not cover every possible error or warning. The tool is intended to highlight likely issues, not guarantee that all localisation problems are detected.
 
-### L2 — Localisation completeness
+## Scope and trade-offs
+- **Smallest complete version:** placeholder majority vote plus a verdict. **Added after:** L2, L3, baseline comparison (fixes), the browser.
+- **Detect only,** no auto-fix: it can't know where a placeholder belongs, and silent fixes would hide a broken export.
+- **L3 is hidden behind L1/L2** to avoid burying critical findings. The trade-off is that a real L3 issue stays invisible until the others are fixed; the summary still shows its count.
+- **Not done:** JSON output, a test suite, thresholds in a config file.
 
-The tool checks for:
+## Next, with another day
+Count and compare choice-group options, check the version string and language codes, flag changed line breaks and length, add a few broken sample files with tests, run it in CI on every change to a localisation file. With larger files and more time the tool could be improved to capture future known game crashers.
 
-- **Removed keys:** Keys present in the old file but absent from the new file.
-- **Missing language entries:** Keys that do not have an entry for a language.
-- **Empty translations:** Entries that exist but contain an empty translation.
-
-Missing entries and empty translations are aggregated by language to make large reports easier to review. Removed keys remain individual findings.
-
-### L3 — Numeric inconsistencies
-
-The tool checks for numbers that occur in only one language for a given key.
-
-For example, if a translation mentions `30` while the corresponding translations in other languages mention only `20`, the tool may flag the discrepancy.
-
-Numbers may legitimately differ between translations, so treat these findings as review suggestions rather than definitive errors.
-
-L3 findings are shown only when there are no L1 or L2 findings.
-
-## Interactive Findings Browser
-
-When findings are available, the browser lets you inspect them without printing the entire report at once.
-
-| Command | Action |
-|---|---|
-| `n` | Next page |
-| `p` | Previous page |
-| `/text` | Search findings for text |
-| `f L1` | Show only L1 findings |
-| `f L2` | Show only L2 findings |
-| `f L3` | Show only L3 findings |
-| `f all` | Show all findings |
-| `q` | Quit the browser |
-
-Findings are displayed in pages of 15 entries. Finding IDs remain stable so you can open a specific finding for more detail.
-
-When inspecting a finding, the detail view uses fields such as:
-
-```text
-KEY:
-LANGUAGE:
-FOUND:
-EXPECTED:
-TEXT:
-```
-
-Not every field applies to every finding type.
-
-## Output
-
-The report starts with an overall verdict, followed by current findings and a separate section for resolved placeholder issues.
-
-- **Current risks** represent issues detected in the new localisation file.
-- **Fixed issues** represent placeholder problems detected in the old file that are no longer detected in the new file.
-
-Resolved issues are informational and are not counted as current risks.
-
-## Exit Codes
-
-| Exit code | Meaning |
-|---|---|
-| `0` | No L1 or L2 issues were detected. |
-| `1` | One or more L1 or L2 issues were detected. |
-
-L3 findings alone do not cause the tool to exit with code `1`.
-
-## Limitations
-
-- Placeholder validation relies on patterns found across languages rather than an authoritative source-language definition.
-- Majority voting can miss errors shared by most languages.
-- Numeric differences may be intentional and require human review.
-- The checks do not replace linguistic review or validation in the application itself.
-
-## Suggested Workflow
-
-1. Update `NEW.plist` with the localisation changes.
-2. Run the checker against `OLD.plist` and `NEW.plist`.
-3. Review L1 and L2 findings first.
-4. Use the interactive browser to search and inspect specific findings.
-5. Review L3 findings when no L1 or L2 issues remain.
-6. Confirm that resolved issues are genuinely fixed.
-7. Run the checker again after making corrections.
-
+## Assumptions
+The baseline is the file currently live; L3 findings give false information to certain languages and can affect gameplay; `en-US` is just another language; the tool runs before release, by a person or in CI.

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>version</key>
+	<string>1.0.1</string>
+	<key>localisations</key>
+	<dict>
+		<key>a1111111-0000-4000-8000-000000000001</key>
+		<dict>
+			<key>en-US</key>
+			<string>You won %d coins!</string>
+			<key>fr</key>
+			<string>Tu as gagné %d pièces !</string>
+			<key>de</key>
+			<string>Du hast %@ Münzen gewonnen!</string>
+			<key>es</key>
+			<string>¡Ganaste %d monedas!</string>
+			<key>ru</key>
+			<string>Вы выиграли %d монет!</string>
+		</dict>
+		<key>a2222222-0000-4000-8000-000000000002</key>
+		<dict>
+			<key>en-US</key>
+			<string>Welcome back, %@! You have %d new messages.</string>
+			<key>fr</key>
+			<string>Bon retour, %@ ! Tu as %d nouveaux messages.</string>
+			<key>de</key>
+			<string>Willkommen zurück, %@! Du hast %d neue Nachrichten.</string>
+			<key>es</key>
+			<string>¡Bienvenido, %@! Tienes mensajes nuevos.</string>
+			<key>ru</key>
+			<string>С возвращением, %@! У вас %d новых сообщений.</string>
+		</dict>
+		<key>a3333333-0000-4000-8000-000000000003</key>
+		<dict>
+			<key>en-US</key>
+			<string>{0} invited you to {1}</string>
+			<key>fr</key>
+			<string>{0} t'a invité à {1}</string>
+			<key>de</key>
+			<string>{0} hat dich eingeladen</string>
+			<key>es</key>
+			<string>{0} te invitó a {1}</string>
+			<key>ru</key>
+			<string>{1}: приглашение от {0}</string>
+		</dict>
+		<key>a4444444-0000-4000-8000-000000000004</key>
+		<dict>
+			<key>en-US</key>
+			<string>Level %1$d of %2$d</string>
+			<key>fr</key>
+			<string>Niveau %1$d sur %2$d</string>
+			<key>de</key>
+			<string>Von %2$d ist Stufe %1$d erreicht</string>
+			<key>es</key>
+			<string>Nivel %1$d de %2$d</string>
+			<key>pt-BR</key>
+			<string>Nível %1$d de %2$d</string>
+			<key>ru</key>
+			<string>Уровень %1$d из %2$d</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

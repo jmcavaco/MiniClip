@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>version</key>
+	<string>1.0.1</string>
+	<key>localisations</key>
+	<dict>
+		<key>b1111111-0000-4000-8000-000000000001</key>
+		<dict>
+			<key>en-US</key>
+			<string>Win 100 coins today!</string>
+			<key>fr</key>
+			<string>Gagne 100 pièces aujourd'hui !</string>
+			<key>de</key>
+			<string>Gewinne heute 100 Münzen!</string>
+			<key>es</key>
+			<string>¡Gana 100 monedas hoy!</string>
+			<key>pt-BR</key>
+			<string>Ganhe 10 moedas hoje!</string>
+		</dict>
+		<key>b2222222-0000-4000-8000-000000000002</key>
+		<dict>
+			<key>en-US</key>
+			<string>Wait 30 seconds.</string>
+			<key>fr</key>
+			<string>Attends 30 secondes.</string>
+			<key>de</key>
+			<string>Warte 3 Sekunden.</string>
+			<key>es</key>
+			<string>Espera 30 segundos.</string>
+			<key>pt-BR</key>
+			<string>Espere 30 segundos.</string>
+		</dict>
+		<key>b3333333-0000-4000-8000-000000000003</key>
+		<dict>
+			<key>en-US</key>
+			<string>Level %u of 10</string>
+			<key>fr</key>
+			<string>Niveau %u sur 10</string>
+			<key>de</key>
+			<string>Stufe %u von 10</string>
+			<key>es</key>
+			<string>Nivel %u de 10</string>
+			<key>pt-BR</key>
+			<string>Nível %u de 10</string>
+		</dict>
+		<key>b4444444-0000-4000-8000-000000000004</key>
+		<dict>
+			<key>en-US</key>
+			<string>Play</string>
+			<key>fr</key>
+			<string>Jouer</string>
+			<key>de</key>
+			<string>Spielen</string>
+			<key>es</key>
+			<string>Jugar</string>
+			<key>pt-BR</key>
+			<string>Jogar</string>
+		</dict>
+	</dict>
+</dict>
+</plist>
